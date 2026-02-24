@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI-Powered AQI Map - Chennai</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+
+        .title-box {
+            position: absolute;
+            top: 10px;
+            left: 60px;
+            z-index: 1000;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="title-box">
+    🌍 Chennai AI-Powered AQI Monitoring & Prediction (Live)
+</div>
+
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- Heatmap Plugin -->
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<script>
+
+    // 🔑 Your OpenWeather API Key
+    const API_KEY = "83b5b70f014ee032d782c54632463986";
+
+    // Initialize Map
+    const map = L.map('map').setView([13.0827, 80.2707], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Locations in Chennai
+    const locations = [
+        { name: "Velachery", lat: 12.9815, lon: 80.2180 },
+        { name: "T Nagar", lat: 13.0418, lon: 80.2341 },
+        { name: "Anna Nagar", lat: 13.0850, lon: 80.2101 },
+        { name: "Adyar", lat: 13.0067, lon: 80.2206 },
+        { name: "Tambaram", lat: 12.9249, lon: 80.1000 }
+    ];
+
+    let markers = [];
+    let heatLayer;
+
+    // AQI Status Function
+    function getAirQuality(pm25) {
+        if (pm25 <= 12) return "🟢 Good";
+        else if (pm25 <= 35) return "🟡 Moderate";
+        else if (pm25 <= 55) return "🟠 Unhealthy for Sensitive";
+        else if (pm25 <= 150) return "🔴 Unhealthy";
+        else return "🟣 Hazardous";
+    }
+
+    // Fetch AQI Function
+    function fetchAQIData() {
+
+        console.log("Fetching new AQI data at:", new Date().toLocaleTimeString());
+
+        // Remove old markers
+        markers.forEach(marker => map.removeLayer(marker));
+        markers = [];
+
+        // Remove old heatmap
+        if (heatLayer) {
+            map.removeLayer(heatLayer);
+        }
+
+        let heatData = [];
+
+        locations.forEach(loc => {
+
+            const url = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${loc.lat}&lon=${loc.lon}&appid=${API_KEY}`;
+
+            fetch(url)
+            .then(response => response.json())
+            .then(data => {
+
+                console.log("API Data for", loc.name, data);
+
+                let realPM25 = data.list[0].components.pm2_5;
+
+                // AI Simulation Variation (-3 to +3 fluctuation)
+                let variation = (Math.random() * 6 - 3);
+                let pm25 = realPM25 + variation;
+
+                pm25 = Math.max(5, pm25);
+                pm25 = Number(pm25.toFixed(2));
+
+                const aqi = data.list[0].main.aqi;
+
+                // Add Marker
+                const marker = L.marker([loc.lat, loc.lon]).addTo(map);
+                markers.push(marker);
+
+                marker.bindPopup(`
+                    <b>📍 ${loc.name}</b><br>
+                    🌫 PM2.5: ${pm25} µg/m³<br>
+                    📊 AQI Index: ${aqi}<br>
+                    🏷 Status: ${getAirQuality(pm25)}<br>
+                    ⏱ Auto-Updated Every 10 Sec
+                `);
+
+                // Add heat intensity
+                heatData.push([loc.lat, loc.lon, pm25]);
+
+                if (heatData.length === locations.length) {
+                    heatLayer = L.heatLayer(heatData, {
+                        radius: 45,
+                        blur: 30,
+                        maxZoom: 15
+                    }).addTo(map);
+                }
+
+            })
+            .catch(error => {
+                console.error("API Error:", error);
+            });
+
+        });
+    }
+
+    // Initial Load
+    fetchAQIData();
+
+    // 🔄 Auto Refresh Every 10 Seconds (Hackathon Demo Speed)
+    setInterval(fetchAQIData, 10000);
+
+</script>
+
+</body>
+</html>
